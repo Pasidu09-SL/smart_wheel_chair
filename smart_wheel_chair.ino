@@ -88,7 +88,8 @@ unsigned long lastWiFiOK = 0;
 // ------------------------------------------------
 
 BLYNK_CONNECTED() {
-  Blynk.virtualWrite(V9, CAM_STREAM_URL);
+  // Note: The ESP32-CAM dynamically registers its live stream URL to V9 on boot.
+  // Blynk.virtualWrite(V9, CAM_STREAM_URL); // Commented out to prevent overwriting the ESP32-CAM's live IP
   Blynk.virtualWrite(V11, systemON ? "RUNNING" : "STOPPED");
   Blynk.virtualWrite(V12, systemON ? 1 : 0);
   lastWiFiOK = millis();
