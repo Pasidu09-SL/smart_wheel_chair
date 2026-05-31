@@ -5,10 +5,10 @@
   1. Joystick control (proportional arcade drive)
   2. Motor driver (L298N)
   3. MPU6050 Gyroscope (tilt safety check with joystick switch reset)
-  4. Dual Ultrasonic Sensors (fixed front sensor & sweeping sensor on servo)
+  4. Dual Ultrasonic Sensors (fixed rear sensor & sweeping front sensor on servo)
   5. Buzzer alerts
   
-  This code runs entirely non-blocking using timers to ensure continuous telemetry
+  This code runs entirely non-blocking, using timers to ensure continuous telemetry
   readings, joystick updates, and safety locks.
 */
 
@@ -37,14 +37,14 @@ const uint8_t MPU_ADDR = 0x68;
 // Buzzer
 const int BUZZER_PIN = 12;
 
-// Servo & Sweeping Ultrasonic Sensor
+// Servo & Sweeping Front Ultrasonic Sensor
 const int SERVO_PIN = 13;
 const int TRIG_SWEEP = 2;
 const int ECHO_SWEEP = 3;
 
-// Fixed Front Ultrasonic Sensor
-const int TRIG_FIXED = 4;
-const int ECHO_FIXED = A2; // Using A2 as a digital pin
+// Fixed Rear Ultrasonic Sensor
+const int TRIG_REAR = 4;
+const int ECHO_REAR = A2; // Using A2 as a digital pin
 
 // Motor Driver (L298N)
 const int ENA = 5;      // Left Motor Speed (PWM)
@@ -71,13 +71,17 @@ const float TILT_LIMIT_DEG = 45.0;
 Servo scanServo;
 
 // Telemetry state
-long frontDistance = 400;
-long sweepDistance = 400;
+long rearDistance = 400;             // Fixed rear sensor reading
+long frontSweepDistance = 400;       // Sweep sensor reading (current angle)
+long frontDistance = 400;            // Calculated minimum distance in front cone
+long frontReadings[7] = {400, 400, 400, 400, 400, 400, 400}; // Front sectors
 float rollAngle = 0.0;
 float pitchAngle = 0.0;
 
 // Safety overrides
 bool tiltEmergency = false;
+bool frontObstacle = false;
+bool rearObstacle = false;
 bool obstacleEmergency = false;
 
 // Non-blocking timers
@@ -87,7 +91,7 @@ const unsigned long fixedSensorInterval = 100; // Read fixed sensor every 100ms
 unsigned long lastServoTime = 0;
 const unsigned long servoInterval = 100;       // Move servo every 100ms
 int servoAngle = 90;
-int servoDirection = 5; // Scan increment
+int servoDirection = 10; // Scan increment (10 degrees for responsive sector updates)
 
 unsigned long lastBuzzerTime = 0;
 bool buzzerState = false;
@@ -174,8 +178,8 @@ void setup() {
   // Ultrasonic Sensors Setup
   pinMode(TRIG_SWEEP, OUTPUT);
   pinMode(ECHO_SWEEP, INPUT);
-  pinMode(TRIG_FIXED, OUTPUT);
-  pinMode(ECHO_FIXED, INPUT);
+  pinMode(TRIG_REAR, OUTPUT);
+  pinMode(ECHO_REAR, INPUT);
 
   // Servo Setup
   scanServo.attach(SERVO_PIN);
@@ -222,13 +226,13 @@ void setup() {
 void loop() {
   unsigned long currentMillis = millis();
 
-  // 1. READ FIXED ULTRASONIC SENSOR (COLLISION AVOIDANCE)
+  // 1. READ FIXED REAR ULTRASONIC SENSOR
   if (currentMillis - lastFixedSensorTime >= fixedSensorInterval) {
     lastFixedSensorTime = currentMillis;
-    frontDistance = readDistanceCm(TRIG_FIXED, ECHO_FIXED);
+    rearDistance = readDistanceCm(TRIG_REAR, ECHO_REAR);
   }
 
-  // 2. NON-BLOCKING SERVO SWEEP
+  // 2. NON-BLOCKING SERVO SWEEP (FRONT SENSOR)
   if (currentMillis - lastServoTime >= servoInterval) {
     lastServoTime = currentMillis;
     
@@ -242,20 +246,28 @@ void loop() {
     }
     
     scanServo.write(servoAngle);
-    sweepDistance = readDistanceCm(TRIG_SWEEP, ECHO_SWEEP);
+    frontSweepDistance = readDistanceCm(TRIG_SWEEP, ECHO_SWEEP);
+
+    // Update front sector readings if servo is looking forward (60° to 120°)
+    if (servoAngle >= 60 && servoAngle <= 120) {
+      int idx = map(servoAngle, 60, 120, 0, 6);
+      if (idx >= 0 && idx < 7) {
+        frontReadings[idx] = frontSweepDistance;
+      }
+    }
   }
 
-  // COMBINED COLLISION AVOIDANCE CHECK
-  // Triggers emergency if fixed front distance is close, OR if sweep sensor
-  // detects an obstacle while scanning forward (between 60 and 120 degrees).
-  bool frontObstacle = (frontDistance > 0 && frontDistance < SAFE_DISTANCE_CM);
-  bool sweepObstacle = (sweepDistance > 0 && sweepDistance < SAFE_DISTANCE_CM && servoAngle >= 60 && servoAngle <= 120);
-
-  if (frontObstacle || sweepObstacle) {
-    obstacleEmergency = true;
-  } else {
-    obstacleEmergency = false;
+  // Calculate the minimum front distance from our front sector readings
+  frontDistance = 400;
+  for (int i = 0; i < 7; i++) {
+    if (frontReadings[i] < frontDistance && frontReadings[i] > 0) {
+      frontDistance = frontReadings[i];
+    }
   }
+
+  // Update obstacle states
+  frontObstacle = (frontDistance > 0 && frontDistance < SAFE_DISTANCE_CM);
+  rearObstacle = (rearDistance > 0 && rearDistance < SAFE_DISTANCE_CM);
 
 #if USE_MPU6050
   // 3. READ GYROSCOPE & CHECK BALANCE
@@ -282,12 +294,12 @@ void loop() {
       if (tiltEmergency) {
         tiltEmergency = false;
         digitalWrite(BUZZER_PIN, LOW); // Silence the buzzer
-        Serial.println("Tilt Emergency Cleared.");
+        Serial.println(F("Tilt Emergency Cleared."));
       }
     }
   }
 
-  // 5. PROCESS EMERGENCY STATUS & ALARM AUDIO
+  // 5. PROCESS EMERGENCY STATUS & ALARM AUDIO (TILT)
   if (tiltEmergency) {
     stopMotors();
     // Solid alarm on tilt emergency
@@ -297,26 +309,14 @@ void loop() {
     static unsigned long lastLog = 0;
     if (currentMillis - lastLog >= 1000) {
       lastLog = currentMillis;
-      Serial.print("[EMERGENCY TILT] Lockout Active. Roll: ");
+      Serial.print(F("[EMERGENCY TILT] Lockout Active. Roll: "));
       Serial.print(rollAngle);
-      Serial.print(" | Pitch: ");
+      Serial.print(F(" | Pitch: "));
       Serial.println(pitchAngle);
     }
     return; // Block motor steering while tilt lock is active
   }
 #endif
-
-  if (obstacleEmergency) {
-    // Slow warning beeps for obstacle warning
-    if (currentMillis - lastBuzzerTime >= 250) {
-      lastBuzzerTime = currentMillis;
-      buzzerState = !buzzerState;
-      digitalWrite(BUZZER_PIN, buzzerState ? HIGH : LOW);
-    }
-  } else {
-    // Make sure buzzer is turned off if no alarm is active
-    digitalWrite(BUZZER_PIN, LOW);
-  }
 
   // 6. JOYSTICK MOTOR STEERING (ARCADE DRIVE MIXING)
   int xVal = analogRead(X_PIN);
@@ -345,14 +345,30 @@ void loop() {
 
   // SAFETY COLLISION BRAKE:
   // If moving forward and obstacle is too close, override drive speed to 0.
-  // Backward driving and static turning are still allowed.
-  if (drive > 0 && obstacleEmergency) {
+  // If moving backward and obstacle is too close, override drive speed to 0.
+  if (drive > 0 && frontObstacle) {
     drive = 0;
-    static unsigned long lastWarnLog = 0;
-    if (currentMillis - lastWarnLog >= 1000) {
-      lastWarnLog = currentMillis;
-      Serial.println("[COLLISION PREVENTED] Forward driving disabled.");
+  } else if (drive < 0 && rearObstacle) {
+    drive = 0;
+  }
+
+  // Trigger buzzer warning only when trying to drive into an obstacle
+  if ((xVal > JOY_DEADZONE_MAX && frontObstacle) || (xVal < JOY_DEADZONE_MIN && rearObstacle)) {
+    obstacleEmergency = true;
+  } else {
+    obstacleEmergency = false;
+  }
+
+  if (obstacleEmergency) {
+    // Slow warning beeps for obstacle warning
+    if (currentMillis - lastBuzzerTime >= 250) {
+      lastBuzzerTime = currentMillis;
+      buzzerState = !buzzerState;
+      digitalWrite(BUZZER_PIN, buzzerState ? HIGH : LOW);
     }
+  } else {
+    // Make sure buzzer is turned off if no alarm is active
+    digitalWrite(BUZZER_PIN, LOW);
   }
 
   // Mix drive and steer values for differential drive
@@ -381,18 +397,65 @@ void loop() {
     digitalWrite(IN4, LOW);
   }
 
-  // 7. PRINT DIAGNOSTICS TO SERIAL (Every 500ms)
+  // 7. DETERMINE ACTION STATE & REACTIVE LOGGING
+  String currentAction = "STOPPED";
+  
+#if USE_MPU6050
+  if (tiltEmergency) {
+    currentAction = "EMERGENCY TILT";
+  } else
+#endif
+  if (xVal > JOY_DEADZONE_MAX && frontObstacle) {
+    currentAction = "BRAKE FRONT";
+  } else if (xVal < JOY_DEADZONE_MIN && rearObstacle) {
+    currentAction = "BRAKE REAR";
+  } else {
+    // Determine direction based on joystick mapping relative to midpoint
+    int driveIntention = 0;
+    int steerIntention = 0;
+    
+    if (xVal > JOY_DEADZONE_MAX) driveIntention = xVal - JOY_MID_X;
+    else if (xVal < JOY_DEADZONE_MIN) driveIntention = xVal - JOY_MID_X;
+    
+    if (yVal > JOY_DEADZONE_MAX) steerIntention = yVal - JOY_MID_Y;
+    else if (yVal < JOY_DEADZONE_MIN) steerIntention = yVal - JOY_MID_Y;
+    
+    if (abs(driveIntention) < 40 && abs(steerIntention) < 40) {
+      currentAction = "STOPPED";
+    } else if (abs(driveIntention) >= abs(steerIntention)) {
+      if (driveIntention > 0) {
+        currentAction = "FORWARD";
+      } else {
+        currentAction = "BACKWARD";
+      }
+    } else {
+      if (steerIntention > 0) {
+        currentAction = "RIGHT";
+      } else {
+        currentAction = "LEFT";
+      }
+    }
+  }
+
+  static String lastAction = "";
+  if (currentAction != lastAction) {
+    lastAction = currentAction;
+    Serial.print(F("Action: "));
+    Serial.println(currentAction);
+  }
+
+  // 8. PRINT DIAGNOSTICS TO SERIAL (Every 500ms)
   static unsigned long lastDiagTime = 0;
   if (currentMillis - lastDiagTime >= 500) {
     lastDiagTime = currentMillis;
-    Serial.print("JoyX: "); Serial.print(xVal);
-    Serial.print(" | JoyY: "); Serial.print(yVal);
+    Serial.print(F("JoyX: ")); Serial.print(xVal);
+    Serial.print(F(" | JoyY: ")); Serial.print(yVal);
 #if USE_MPU6050
-    Serial.print(" | Roll: "); Serial.print(rollAngle, 1);
-    Serial.print(" | Pitch: "); Serial.print(pitchAngle, 1);
+    Serial.print(F(" | Roll: ")); Serial.print(rollAngle, 1);
+    Serial.print(F(" | Pitch: ")); Serial.print(pitchAngle, 1);
 #endif
-    Serial.print(" | Front: "); Serial.print(frontDistance);
-    Serial.print("cm | Sweep: "); Serial.print(sweepDistance);
-    Serial.println("cm");
+    Serial.print(F(" | Rear: ")); Serial.print(rearDistance);
+    Serial.print(F("cm | Front: ")); Serial.print(frontDistance);
+    Serial.println(F("cm"));
   }
 }
