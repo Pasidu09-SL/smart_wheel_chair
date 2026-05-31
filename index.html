@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Assistive Wheelchair - Live Dashboard</title>
+  <meta name="description" content="Futuristic live camera stream viewer and Blynk telemetry controller dashboard for the Smart Assistive Wheelchair.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* CSS CUSTOM VARIABLES */
+    :root {
+      --bg-gradient: linear-gradient(135deg, #090e1a 0%, #05070e 100%);
+      --accent-color: #00f0ff;
+      --accent-glow: rgba(0, 240, 255, 0.4);
+      --success-color: #00ff66;
+      --success-glow: rgba(0, 255, 102, 0.4);
+      --warning-color: #ffaa00;
+      --danger-color: #ff0055;
+      --danger-glow: rgba(255, 0, 85, 0.4);
+      --panel-bg: rgba(20, 25, 45, 0.45);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f0f4f8;
+      --text-muted: #8a9fc4;
+      --font-body: 'Outfit', sans-serif;
+      --font-display: 'Space Grotesk', sans-serif;
+    }
+
+    /* GENERAL STYLING */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding-bottom: 2rem;
+    }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-glow);
+    }
+
+    /* HEADER */
+    header {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem 2rem 1.5rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--panel-border);
+      backdrop-filter: blur(5px);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      fill: none;
+      stroke: var(--accent-color);
+      stroke-width: 2;
+      filter: drop-shadow(0 0 8px var(--accent-color));
+      animation: pulse 2s infinite ease-in-out;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, #fff 0%, var(--text-muted) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--accent-color);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-top: 2px;
+    }
+
+    .system-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      padding: 8px 16px;
+      border-radius: 50px;
+      font-size: 0.9rem;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50px;
+      background: var(--text-muted);
+      box-shadow: 0 0 8px var(--text-muted);
+      transition: all 0.3s ease;
+    }
+
+    .status-dot.active {
+      background: var(--success-color);
+      box-shadow: 0 0 12px var(--success-color);
+    }
+
+    .status-dot.error {
+      background: var(--danger-color);
+      box-shadow: 0 0 12px var(--danger-color);
+    }
+
+    /* MAIN CONTENT LAYOUT */
+    main {
+      max-width: 1400px;
+      margin: 1.5rem auto 0 auto;
+      padding: 0 2rem;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 1024px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* DASHBOARD CARD GENERAL STYLES */
+    .dashboard-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+
+    .dashboard-card:hover {
+      border-color: rgba(0, 240, 255, 0.2);
+    }
+
+    .dashboard-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.2), transparent);
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+    }
+
+    .card-title svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--accent-color);
+      stroke-width: 2;
+    }
+
+    /* VIDEO STREAM SECTION */
+    .stream-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .video-viewport {
+      width: 100%;
+      aspect-ratio: 4/3;
+      background: #020306;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8);
+    }
+
+    .video-feed {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: none;
+    }
+
+    .feed-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      z-index: 2;
+    }
+
+    .feed-placeholder svg {
+      width: 60px;
+      height: 60px;
+      stroke: rgba(255, 255, 255, 0.15);
+      stroke-width: 1.5;
+    }
+
+    .stream-overlay-badge {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(255, 0, 85, 0.3);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--danger-color);
+      display: none;
+      align-items: center;
+      gap: 6px;
+      text-transform: uppercase;
+      z-index: 3;
+    }
+
+    .stream-overlay-badge::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: var(--danger-color);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--danger-color);
+      animation: blink 1s infinite alternate;
+    }
+
+    .stream-overlay-actions {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      display: flex;
+      gap: 8px;
+      z-index: 3;
+    }
+
+    .icon-button {
+      background: rgba(10, 15, 30, 0.8);
+      border: 1px solid var(--panel-border);
+      color: #fff;
+      padding: 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(5px);
+    }
+
+    .icon-button:hover {
+      background: var(--accent-color);
+      color: #000;
+      border-color: var(--accent-color);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    }
+
+    .icon-button svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+    }
+
+    /* CONTROLS BAR */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 640px) {
+      .controls-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    input[type="text"] {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #fff;
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      width: 100%;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent-color);
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
+    }
+
+    .btn {
+      background: var(--accent-color);
+      color: #030712;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-weight: 600;
+      font-family: var(--font-body);
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      align-self: flex-end;
+      height: 42px;
+      width: 100%;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      letter-spacing: 0.5px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--panel-border);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: none;
+    }
+
+    .btn-danger {
+      background: var(--danger-color);
+      color: #fff;
+    }
+
+    .btn-danger:hover {
+      box-shadow: 0 0 15px var(--danger-glow);
+    }
+
+    /* TELEMETRY / CONTROL PANEL RIGHT COLUMN */
+    .right-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* TELEMETRY GAUGES GRID */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .telemetry-item {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .telemetry-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .telemetry-value-container {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin-top: 12px;
+    }
+
+    .telemetry-value {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .telemetry-unit {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .gauge-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+
+    .gauge-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent-color);
+      border-radius: 3px;
+      transition: width 0.5s ease, background-color 0.5s ease;
+    }
+
+    /* TILT/ATTITUDE INDICATOR */
+    .attitude-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .gyro-container {
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      border: 3px solid var(--panel-border);
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(circle, #0e162b 0%, #05070e 100%);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+    }
+
+    .gyro-horizon {
+      width: 100%;
+      height: 2px;
+      background: var(--panel-border);
+      position: absolute;
+      z-index: 1;
+    }
+
+    .gyro-dial {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      position: absolute;
+      transition: transform 0.2s ease;
+    }
+
+    .wheelchair-graphic {
+      width: 50px;
+      height: 50px;
+      stroke: var(--accent-color);
+      stroke-width: 2.5;
+      fill: none;
+      z-index: 2;
+      transition: transform 0.2s ease;
+      filter: drop-shadow(0 0 5px var(--accent-glow));
+    }
+
+    .warning-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 0, 85, 0.15);
+      z-index: 3;
+      pointer-events: none;
+      display: none;
+      animation: alert-flash 0.5s infinite alternate;
+    }
+
+    /* CONTROL PANEL CONFIGURATION */
+    .system-switches {
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .switch-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .switch-label-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* SLIDER CONTROL */
+    .speed-slider-container {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.08);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent-color);
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--accent-color);
+      transition: transform 0.1s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .slider-value {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.1rem;
+      min-width: 35px;
+      text-align: right;
+    }
+
+    /* KEYBOARD CONTROL INSTRUCTION */
+    .keyboard-card {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .keymap-layout {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      margin: 0.5rem 0;
+    }
+
+    .keymap-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .key-btn {
+      width: 46px;
+      height: 46px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      transition: all 0.1s ease;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .key-btn.active {
+      background: var(--accent-color);
+      color: #000;
+      border-color: var(--accent-color);
+      box-shadow: 0 0 15px var(--accent-glow);
+      transform: translateY(2px);
+    }
+
+    .key-instructions {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* CONSOLE CARD */
+    .console-box {
+      width: 100%;
+      height: 110px;
+      background: rgba(0, 0, 0, 0.45);
+      border-radius: 8px;
+      border: 1px solid var(--panel-border);
+      padding: 10px;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.8rem;
+      color: var(--success-color);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .console-line {
+      display: flex;
+      gap: 8px;
+    }
+
+    .console-timestamp {
+      color: var(--text-muted);
+    }
+
+    /* TOGGLE SWITCH CUST */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 26px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider-toggle {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.1);
+      transition: .4s;
+      border-radius: 34px;
+      border: 1px solid var(--panel-border);
+    }
+
+    .slider-toggle:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: var(--text-muted);
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider-toggle {
+      background-color: rgba(0, 255, 102, 0.15);
+      border-color: var(--success-color);
+    }
+
+    input:checked + .slider-toggle:before {
+      transform: translateX(24px);
+      background-color: var(--success-color);
+      box-shadow: 0 0 8px var(--success-color);
+    }
+
+    /* KEYFRAMES */
+    @keyframes pulse {
+      0% {
+        opacity: 0.8;
+        filter: drop-shadow(0 0 4px var(--accent-glow));
+      }
+      50% {
+        opacity: 1;
+        filter: drop-shadow(0 0 12px var(--accent-color));
+      }
+      100% {
+        opacity: 0.8;
+        filter: drop-shadow(0 0 4px var(--accent-glow));
+      }
+    }
+
+    @keyframes blink {
+      0% { opacity: 0.2; }
+      100% { opacity: 1; }
+    }
+
+    @keyframes alert-flash {
+      0% { opacity: 0.1; }
+      100% { opacity: 0.5; }
+    }
+
+    /* TOAST NOTIFICATION */
+    .toast {
+      position: fixed;
+      bottom: 25px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: rgba(10, 15, 30, 0.95);
+      border: 1px solid var(--accent-color);
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      z-index: 999;
+      pointer-events: none;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 240, 255, 0.2);
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* CAMERA TUNING STYLES */
+    .tuning-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+    }
+
+    @media (max-width: 640px) {
+      .tuning-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .tuning-row {
+      grid-column: span 2;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    @media (max-width: 640px) {
+      .tuning-row {
+        grid-column: span 1;
+      }
+    }
+
+    .tuning-row-half {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .slider-row {
+      flex-direction: column;
+      align-items: flex-start;
+      border: none;
+      gap: 6px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .tuning-select {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #fff;
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      width: 100%;
+      outline: none;
+    }
+
+    .tuning-select:focus {
+      border-color: var(--accent-color);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-container">
+      <svg class="logo-icon" viewBox="0 0 24 24">
+        <!-- Custom Wheelchair Vector Design -->
+        <circle cx="9" cy="17" r="4" />
+        <path d="M9 13v-8h8m-8 3h6m2 5v2m-6-10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0" />
+      </svg>
+      <div>
+        <h1>Smart Assistive Wheelchair</h1>
+        <div class="subtitle">Live Portal</div>
+      </div>
+    </div>
+    <div class="system-status">
+      <div id="statusDot" class="status-dot"></div>
+      <span id="statusText">System: Connecting...</span>
+    </div>
+  </header>
+
+  <!-- MAIN SECTION -->
+  <main>
+    
+    <!-- LEFT COLUMN: STREAM VIEWER & SETUP -->
+    <section class="stream-container">
+      
+      <!-- VIEWPORT -->
+      <div class="dashboard-card" style="padding: 0; border-radius: 16px; overflow: hidden;">
+        <div class="video-viewport" id="viewportContainer">
+          <div id="liveBadge" class="stream-overlay-badge">Live</div>
+          
+          <div class="stream-overlay-actions">
+            <button class="icon-button" id="snapBtn" title="Take Photo">
+              <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </button>
+            <button class="icon-button" id="fsBtn" title="Toggle Fullscreen">
+              <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            </button>
+          </div>
+          
+          <!-- IMAGE TAG FOR STREAM -->
+          <img id="cameraFeed" class="video-feed" alt="ESP32-CAM Live Feed">
+          
+          <!-- PLACEHOLDER / OFFLINE VIEW -->
+          <div class="feed-placeholder" id="placeholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+            <div>
+              <h3>Stream Offline</h3>
+              <p style="font-size: 0.85rem; margin-top: 6px;">Configure IP settings below and click Connect Stream</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTROLS & CONFIGURATION PANEL -->
+      <div class="dashboard-card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          Device Parameters
+        </div>
+        <div class="controls-grid">
+          <div class="form-group">
+            <label for="camIp">ESP32-CAM Host/IP</label>
+            <input type="text" id="camIp" placeholder="e.g. 10.30.4.190" value="10.30.4.190">
+          </div>
+          <div class="form-group">
+            <label for="blynkToken">Blynk Auth Token</label>
+            <input type="text" id="blynkToken" placeholder="Auth Token" value="UH1kH3VfahOMHcsuB1hBfplnAWnL9e2T">
+          </div>
+          <div class="form-group" style="justify-content: flex-end;">
+            <button class="btn" id="connectBtn">Connect Stream</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAMERA TUNING PANEL -->
+      <div class="dashboard-card" id="cameraTuningCard" style="margin-top: 1.5rem;">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg>
+          Camera Tuning
+        </div>
+        <div class="tuning-grid">
+          
+          <div class="tuning-row">
+            <div>
+              <div style="font-weight: 600;">LED Flash Light</div>
+              <div class="switch-label-desc">Toggle onboard flash (GPIO 4)</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="flashToggle">
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+
+          <div class="tuning-row">
+            <div class="form-group" style="width: 100%;">
+              <label for="frameSizeSelect">Resolution</label>
+              <select id="frameSizeSelect" class="tuning-select">
+                <option value="10">UXGA (1600x1200)</option>
+                <option value="8">SVGA (800x600)</option>
+                <option value="5">VGA (640x480)</option>
+                <option value="4">CIF (352x288)</option>
+                <option value="3">QVGA (320x240)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="tuning-row slider-row">
+            <div class="slider-header">
+              <label>JPEG Quality</label>
+              <span id="qualityValText">10</span>
+            </div>
+            <input type="range" id="qualitySlider" min="10" max="63" value="10">
+          </div>
+
+          <div class="tuning-row slider-row">
+            <div class="slider-header">
+              <label>Brightness</label>
+              <span id="brightnessValText">0</span>
+            </div>
+            <input type="range" id="brightnessSlider" min="-2" max="2" value="0">
+          </div>
+
+          <div class="tuning-row slider-row">
+            <div class="slider-header">
+              <label>Contrast</label>
+              <span id="contrastValText">0</span>
+            </div>
+            <input type="range" id="contrastSlider" min="-2" max="2" value="0">
+          </div>
+
+          <div class="tuning-row-half">
+            <div>
+              <div style="font-weight: 600;">Vertical Flip</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="vflipToggle">
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+
+          <div class="tuning-row-half">
+            <div>
+              <div style="font-weight: 600;">Mirror Image</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="hmirrorToggle">
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT COLUMN: TELEMETRY & JOYSTICK CONTROLS -->
+    <section class="right-column">
+      
+      <!-- CORE CONTROLS & SETTINGS -->
+      <div class="dashboard-card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/></svg>
+          System Controls
+        </div>
+        <div class="system-switches">
+          
+          <div class="switch-row">
+            <div>
+              <div style="font-weight: 600;">Wheelchair Drive Power</div>
+              <div class="switch-label-desc">Toggle Blynk V12 status (RUNNING/STOPPED)</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="systemToggle">
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+
+          <div class="switch-row" style="flex-direction: column; align-items: flex-start; border: none; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; width: 100%;">
+              <div>
+                <div style="font-weight: 600;">Max Speed Limit</div>
+                <div class="switch-label-desc">Adjust Blynk Speed Pin V2</div>
+              </div>
+              <span class="slider-value" id="speedValText">180</span>
+            </div>
+            <div class="speed-slider-container">
+              <input type="range" id="speedSlider" min="0" max="255" value="180">
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- SENSOR TELEMETRY -->
+      <div class="dashboard-card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21.21 15.89A10 10 0 1 1 8 2.83M22 12A10 10 0 0 0 12 2v10z"/></svg>
+          Sensor Telemetry
+        </div>
+        <div class="telemetry-grid">
+          
+          <div class="telemetry-item">
+            <span class="telemetry-label">Front Range</span>
+            <div class="telemetry-value-container">
+              <span id="frontDistVal" class="telemetry-value">--</span>
+              <span class="telemetry-unit">cm</span>
+            </div>
+            <div class="gauge-bar-bg">
+              <div id="frontDistBar" class="gauge-bar-fill"></div>
+            </div>
+          </div>
+
+          <div class="telemetry-item">
+            <span class="telemetry-label">Rear Range</span>
+            <div class="telemetry-value-container">
+              <span id="backDistVal" class="telemetry-value">--</span>
+              <span class="telemetry-unit">cm</span>
+            </div>
+            <div class="gauge-bar-bg">
+              <div id="backDistBar" class="gauge-bar-fill"></div>
+            </div>
+          </div>
+
+          <div class="telemetry-item">
+            <span class="telemetry-label">Battery Level</span>
+            <div class="telemetry-value-container">
+              <span id="batteryVal" class="telemetry-value">--</span>
+              <span class="telemetry-unit">V</span>
+            </div>
+            <div class="gauge-bar-bg">
+              <div id="batteryBar" class="gauge-bar-fill"></div>
+            </div>
+          </div>
+
+          <!-- ATTITUDE / TILT ANGLE -->
+          <div class="telemetry-item attitude-card">
+            <span class="telemetry-label" style="align-self: flex-start;">Tilt Attitude</span>
+            
+            <div class="gyro-container">
+              <div class="gyro-horizon"></div>
+              <div class="gyro-dial" id="gyroDial"></div>
+              <!-- Simulated Wheelchair silhouette -->
+              <svg class="wheelchair-graphic" id="wcGraphic" viewBox="0 0 24 24">
+                <circle cx="8" cy="18" r="3" />
+                <circle cx="16" cy="18" r="3" />
+                <path d="M12 15h4v-7h-5v5m-4-6h9" />
+              </svg>
+              <div class="warning-overlay" id="tiltAlertOverlay"></div>
+            </div>
+            
+            <div style="font-size: 0.8rem; font-weight: 700; color:#fff;" id="rollAngleText">Roll: --°</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- KEYBOARD DRIVING CONTROLS -->
+      <div class="dashboard-card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><line x1="6" y1="8" x2="6.01" y2="8"/><line x1="10" y1="8" x2="10.01" y2="8"/><line x1="14" y1="8" x2="14.01" y2="8"/><line x1="18" y1="8" x2="18.01" y2="8"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="10" y1="12" x2="10.01" y2="12"/><line x1="14" y1="12" x2="14.01" y2="12"/><line x1="18" y1="12" x2="18.01" y2="12"/><line x1="7" y1="16" x2="17" y2="16"/></svg>
+          Keyboard Steering
+        </div>
+        <div class="keymap-layout">
+          <div class="keymap-row">
+            <div class="key-btn" id="keyW" title="Forward">W</div>
+          </div>
+          <div class="keymap-row">
+            <div class="key-btn" id="keyA" title="Turn Left">A</div>
+            <div class="key-btn" id="keyS" title="Backward">S</div>
+            <div class="key-btn" id="keyD" title="Turn Right">D</div>
+          </div>
+        </div>
+        <div class="key-instructions">
+          Use W / A / S / D (or Arrow Keys) to steer the wheelchair when Drive Power is enabled.<br>
+          <span style="color: var(--accent-color); font-weight: 600;">Releasing keys will automatically STOP motors.</span>
+        </div>
+      </div>
+
+      <!-- CONSOLE OUT -->
+      <div class="dashboard-card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          Telemetry Console
+        </div>
+        <div class="console-box" id="consoleBox">
+          <div class="console-line"><span class="console-timestamp">[00:00:00]</span> Dashboard initialized. Ready to connect.</div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast" class="toast">Stream connected successfully.</div>
+
+  <script>
+    // DASHBOARD STATE
+    let isConnected = false;
+    let blynkInterval = null;
+    let activeKeys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+    let lastSentJoystick = { x: 0, y: 0 };
+    let joystickTransmitTimer = null;
+
+    // DOM ELEMENTS
+    const camIpInput = document.getElementById('camIp');
+    const blynkTokenInput = document.getElementById('blynkToken');
+    const connectBtn = document.getElementById('connectBtn');
+    const cameraFeed = document.getElementById('cameraFeed');
+    const placeholder = document.getElementById('placeholder');
+    const liveBadge = document.getElementById('liveBadge');
+    
+    const snapBtn = document.getElementById('snapBtn');
+    const fsBtn = document.getElementById('fsBtn');
+    const viewportContainer = document.getElementById('viewportContainer');
+    
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const consoleBox = document.getElementById('consoleBox');
+    
+    const systemToggle = document.getElementById('systemToggle');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValText = document.getElementById('speedValText');
+    
+    // Telemetry Values
+    const frontDistVal = document.getElementById('frontDistVal');
+    const frontDistBar = document.getElementById('frontDistBar');
+    const backDistVal = document.getElementById('backDistVal');
+    const backDistBar = document.getElementById('backDistBar');
+    const batteryVal = document.getElementById('batteryVal');
+    const batteryBar = document.getElementById('batteryBar');
+    const gyroDial = document.getElementById('gyroDial');
+    const wcGraphic = document.getElementById('wcGraphic');
+    const rollAngleText = document.getElementById('rollAngleText');
+    const tiltAlertOverlay = document.getElementById('tiltAlertOverlay');
+    const toastElement = document.getElementById('toast');
+
+    // Camera tuning DOM variables
+    const cameraTuningCard = document.getElementById('cameraTuningCard');
+    const flashToggle = document.getElementById('flashToggle');
+    const frameSizeSelect = document.getElementById('frameSizeSelect');
+    const qualitySlider = document.getElementById('qualitySlider');
+    const qualityValText = document.getElementById('qualityValText');
+    const brightnessSlider = document.getElementById('brightnessSlider');
+    const brightnessValText = document.getElementById('brightnessValText');
+    const contrastSlider = document.getElementById('contrastSlider');
+    const contrastValText = document.getElementById('contrastValText');
+    const vflipToggle = document.getElementById('vflipToggle');
+    const hmirrorToggle = document.getElementById('hmirrorToggle');
+
+    // LOCAL STORAGE CONFIG
+    if (localStorage.getItem('esp32_cam_ip')) {
+      camIpInput.value = localStorage.getItem('esp32_cam_ip');
+    }
+    if (localStorage.getItem('blynk_auth_token')) {
+      blynkTokenInput.value = localStorage.getItem('blynk_auth_token');
+    }
+
+    // CONSOLE LOGGER
+    function log(message, type = 'success') {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0];
+      const line = document.createElement('div');
+      line.className = 'console-line';
+      let colorClass = 'var(--success-color)';
+      if (type === 'error') colorClass = 'var(--danger-color)';
+      if (type === 'info') colorClass = 'var(--accent-color)';
+      
+      line.innerHTML = `<span class="console-timestamp">[${timeStr}]</span> <span style="color: ${colorClass};">${message}</span>`;
+      consoleBox.appendChild(line);
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+
+    // SHOW TOAST
+    function showToast(message) {
+      toastElement.innerText = message;
+      toastElement.classList.add('show');
+      setTimeout(() => {
+        toastElement.classList.remove('show');
+      }, 3000);
+    }
+
+    // STREAM CONNECTION CONTROL
+    connectBtn.addEventListener('click', () => {
+      const host = camIpInput.value.trim();
+      const token = blynkTokenInput.value.trim();
+
+      if (!host) {
+        log("Error: Host/IP is required.", "error");
+        return;
+      }
+
+      // Save configs
+      localStorage.setItem('esp32_cam_ip', host);
+      localStorage.setItem('blynk_auth_token', token);
+
+      if (!isConnected) {
+        // HTTPS Mixed Content Warning
+        if (window.location.protocol === 'https:') {
+          log("Warning: You are running this dashboard over HTTPS. Modern browsers block HTTP camera streams on HTTPS pages. Please open this index.html file directly as a local file (file:///...) or serve it on a standard HTTP localhost port.", "error");
+        }
+
+        // CONNECT
+        log(`Initiating stream connection to http://${host}/stream ...`, 'info');
+        connectBtn.innerText = "Disconnect";
+        connectBtn.classList.add('btn-danger');
+        
+        // Build stream URL (Port 80)
+        cameraFeed.src = `http://${host}/stream`;
+        cameraFeed.style.display = 'block';
+        placeholder.style.display = 'none';
+        liveBadge.style.display = 'flex';
+        
+        isConnected = true;
+        showToast("Connecting to camera stream...");
+
+        // Start polling telemetry if token is provided
+        if (token) {
+          startBlynkPolling(token);
+        } else {
+          log("Blynk Auth Token is missing. Controls and telemetry will be disabled.", "error");
+        }
+      } else {
+        // DISCONNECT
+        disconnectStream();
+      }
+    });
+
+    function disconnectStream() {
+      if (!isConnected) return;
+      
+      log("Disconnecting stream...", "info");
+      cameraFeed.removeAttribute('src'); // Fully clear image resource to release connection
+      cameraFeed.style.display = 'none';
+      placeholder.style.display = 'flex';
+      liveBadge.style.display = 'none';
+      
+      connectBtn.innerText = "Connect Stream";
+      connectBtn.classList.remove('btn-danger');
+      
+      statusDot.className = 'status-dot';
+      statusText.innerText = "System: Offline";
+      isConnected = false;
+      
+      stopBlynkPolling();
+      
+      // Reset flash toggle state locally if desired
+      
+      log("Stream disconnected.", "info");
+      showToast("Stream disconnected.");
+    }
+
+    // Camera Load & Error Handlers
+    cameraFeed.onload = () => {
+      if (isConnected) {
+        log("Stream loaded and playing successfully.", "success");
+        statusDot.className = 'status-dot active';
+        statusText.innerText = "System: Connected";
+        showToast("Stream connected successfully.");
+        
+        // Fetch camera configuration status
+        fetchCameraStatus(camIpInput.value.trim());
+      }
+    };
+
+    cameraFeed.onerror = () => {
+      if (isConnected) {
+        log("Camera feed failed to load. Check that the ESP32 IP is correct, online, and on the same network.", "error");
+        disconnectStream();
+      }
+    };
+
+    // CAMERA TUNING LOGIC
+    async function fetchCameraStatus(host) {
+      log(`Syncing camera configuration settings from http://${host}/status ...`, 'info');
+      try {
+        const response = await fetch(`http://${host}/status`);
+        if (response.ok) {
+          const status = await response.json();
+          
+          flashToggle.checked = status.flash === 1;
+          frameSizeSelect.value = status.framesize;
+          
+          qualitySlider.value = status.quality;
+          qualityValText.innerText = status.quality;
+          
+          brightnessSlider.value = status.brightness;
+          brightnessValText.innerText = status.brightness;
+          
+          contrastSlider.value = status.contrast;
+          contrastValText.innerText = status.contrast;
+          
+          vflipToggle.checked = status.vflip === 1;
+          hmirrorToggle.checked = status.hmirror === 1;
+          
+          log("Camera settings successfully synced.", "success");
+        } else {
+          throw new Error("HTTP Status Error");
+        }
+      } catch (err) {
+        log("ESP32-CAM /status endpoint offline. Tuning panel operating in standard control mode.", "info");
+      }
+    }
+
+    async function sendCameraControl(variable, value) {
+      const host = camIpInput.value.trim();
+      if (!host || !isConnected) return;
+      try {
+        const res = await fetch(`http://${host}/control?var=${variable}&val=${value}`);
+        if (res.ok) {
+          log(`Camera Control Applied: ${variable} = ${value}`, "success");
+        } else {
+          log(`Failed to apply setting: ${variable}`, "error");
+        }
+      } catch (err) {
+        log(`Camera control error: ${err.message}`, "error");
+      }
+    }
+
+    // Flash toggle event
+    flashToggle.addEventListener('change', () => {
+      sendCameraControl('flash', flashToggle.checked ? 1 : 0);
+    });
+
+    // Resolution dropdown change event
+    frameSizeSelect.addEventListener('change', () => {
+      sendCameraControl('framesize', frameSizeSelect.value);
+      log("Note: Changing camera resolution may cause the stream to briefly reconnect.", "info");
+      
+      // Reload stream to refresh the resolution settings in viewport
+      setTimeout(() => {
+        if (isConnected) {
+          const host = camIpInput.value.trim();
+          cameraFeed.src = `http://${host}/stream`;
+        }
+      }, 500);
+    });
+
+    // Sliders input events (local value update)
+    qualitySlider.addEventListener('input', () => { qualityValText.innerText = qualitySlider.value; });
+    brightnessSlider.addEventListener('input', () => { brightnessValText.innerText = brightnessSlider.value; });
+    contrastSlider.addEventListener('input', () => { contrastValText.innerText = contrastSlider.value; });
+
+    // Sliders change events (transmit only after release)
+    qualitySlider.addEventListener('change', () => { sendCameraControl('quality', qualitySlider.value); });
+    brightnessSlider.addEventListener('change', () => { sendCameraControl('brightness', brightnessSlider.value); });
+    contrastSlider.addEventListener('change', () => { sendCameraControl('contrast', contrastSlider.value); });
+
+    // VFlip / Mirror toggles events
+    vflipToggle.addEventListener('change', () => { sendCameraControl('vflip', vflipToggle.checked ? 1 : 0); });
+    hmirrorToggle.addEventListener('change', () => { sendCameraControl('hmirror', hmirrorToggle.checked ? 1 : 0); });
+
+    // TAKING SNAPSHOT
+    snapBtn.addEventListener('click', () => {
+      if (!isConnected) {
+        showToast("Connect to a live stream first!");
+        return;
+      }
+      
+      // Draw frame to temporary canvas to save
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = cameraFeed.naturalWidth || 640;
+        canvas.height = cameraFeed.naturalHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        const link = document.createElement('a');
+        link.download = `wheelchair-snapshot-${Date.now()}.jpg`;
+        link.href = dataUrl;
+        link.click();
+        log("Captured and downloaded snapshot.", "success");
+        showToast("Snapshot downloaded.");
+      } catch (err) {
+        log(`Failed to capture snapshot: ${err.message}`, "error");
+        // Fallback for CORS
+        log("If snapshot fails, make sure your browser doesn't block cross-origin requests from the camera IP.", "info");
+      }
+    });
+
+    // FULLSCREEN CONTROL
+    fsBtn.addEventListener('click', () => {
+      if (!isConnected) return;
+      if (!document.fullscreenElement) {
+        viewportContainer.requestFullscreen()
+          .then(() => {
+            log("Entered fullscreen mode.", "info");
+          })
+          .catch(err => {
+            log(`Fullscreen error: ${err.message}`, "error");
+          });
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    // BLYNK API INTEGRATION
+    function startBlynkPolling(token) {
+      log("Started Blynk real-time telemetry updates.", "info");
+      
+      // Initial poll
+      pollBlynkStatus(token);
+      
+      // Setup interval
+      blynkInterval = setInterval(() => {
+        pollBlynkStatus(token);
+      }, 1500);
+    }
+
+    function stopBlynkPolling() {
+      if (blynkInterval) {
+        clearInterval(blynkInterval);
+        blynkInterval = null;
+        log("Stopped Blynk telemetry polling.", "info");
+      }
+    }
+
+    async function pollBlynkStatus(token) {
+      try {
+        // Fetch pins: V3 (Front Dist), V4 (Back Dist), V8 (Battery), V7 (Roll), V11 (State String), V5 (Tilt Alert), V6 (Obstacle Alert)
+        // Note: We perform parallel fetches for reliability across different Blynk regions/cores
+        const pins = ['V3', 'V4', 'V7', 'V8', 'V11', 'V5', 'V6', 'V12', 'V2'];
+        const results = await Promise.all(pins.map(pin => 
+          fetch(`https://blynk.cloud/external/api/get?token=${token}&${pin}`)
+            .then(res => res.text())
+            .then(val => ({ pin, val: val.trim() }))
+            .catch(() => ({ pin, val: null }))
+        ));
+
+        const data = {};
+        results.forEach(r => {
+          if (r.val !== null) data[r.pin] = r.val;
+        });
+
+        // 1. FRONT DISTANCE V3
+        if (data['V3']) {
+          const val = parseFloat(data['V3']);
+          frontDistVal.innerText = val.toFixed(1);
+          const percent = Math.min((val / 400) * 100, 100);
+          frontDistBar.style.width = `${percent}%`;
+          
+          if (val <= 20) {
+            frontDistBar.style.backgroundColor = 'var(--danger-color)';
+          } else if (val <= 60) {
+            frontDistBar.style.backgroundColor = 'var(--warning-color)';
+          } else {
+            frontDistBar.style.backgroundColor = 'var(--success-color)';
+          }
+        }
+
+        // 2. BACK DISTANCE V4
+        if (data['V4']) {
+          const val = parseFloat(data['V4']);
+          backDistVal.innerText = val.toFixed(1);
+          const percent = Math.min((val / 400) * 100, 100);
+          backDistBar.style.width = `${percent}%`;
+          
+          if (val <= 20) {
+            backDistBar.style.backgroundColor = 'var(--danger-color)';
+          } else if (val <= 60) {
+            backDistBar.style.backgroundColor = 'var(--warning-color)';
+          } else {
+            backDistBar.style.backgroundColor = 'var(--success-color)';
+          }
+        }
+
+        // 3. BATTERY V8
+        if (data['V8']) {
+          const val = parseFloat(data['V8']);
+          batteryVal.innerText = val.toFixed(2);
+          // Scale battery (assume 6V low to 8.4V max)
+          const minV = 6.0;
+          const maxV = 8.4;
+          let percent = ((val - minV) / (maxV - minV)) * 100;
+          percent = Math.max(0, Math.min(percent, 100));
+          
+          batteryBar.style.width = `${percent}%`;
+          if (val <= 6.4) {
+            batteryBar.style.backgroundColor = 'var(--danger-color)';
+          } else if (val <= 7.2) {
+            batteryBar.style.backgroundColor = 'var(--warning-color)';
+          } else {
+            batteryBar.style.backgroundColor = 'var(--success-color)';
+          }
+        }
+
+        // 4. ROLL GYRO V7
+        if (data['V7']) {
+          const val = parseFloat(data['V7']);
+          rollAngleText.innerText = `Roll: ${val.toFixed(1)}°`;
+          
+          // Rotate indicator line and silhouette
+          gyroDial.style.transform = `rotate(${-val}deg)`;
+          wcGraphic.style.transform = `rotate(${val}deg)`;
+        }
+
+        // 5. TILT ALERT V5 & OBSTACLE ALERT V6
+        if (data['V5'] && data['V5'] === '255') {
+          tiltAlertOverlay.style.display = 'block';
+          log("WARNING: High tilt detected! Wheelchair stopped.", "error");
+        } else {
+          tiltAlertOverlay.style.display = 'none';
+        }
+
+        // 6. POWER TOGGLE SYNC V12
+        if (data['V12']) {
+          systemToggle.checked = (data['V12'] === '1');
+        }
+
+        // 7. SPEED SLIDER SYNC V2
+        if (data['V2']) {
+          const speed = parseInt(data['V2']);
+          speedSlider.value = speed;
+          speedValText.innerText = speed;
+        }
+
+      } catch (err) {
+        log(`Blynk Poll Failed: ${err.message}`, "error");
+      }
+    }
+
+    // UPDATE BLYNK CONTROLS
+    systemToggle.addEventListener('change', async () => {
+      const token = blynkTokenInput.value.trim();
+      if (!token) return;
+      const state = systemToggle.checked ? 1 : 0;
+      
+      try {
+        const res = await fetch(`https://blynk.cloud/external/api/update?token=${token}&V12=${state}`);
+        if (res.ok) {
+          log(`Drive Power set to: ${state ? "ON (RUNNING)" : "OFF (STOPPED)"}`, "info");
+        } else {
+          log("Failed to update power state on Blynk.", "error");
+        }
+      } catch (err) {
+        log(`Power toggle error: ${err.message}`, "error");
+      }
+    });
+
+    speedSlider.addEventListener('input', () => {
+      speedValText.innerText = speedSlider.value;
+    });
+
+    speedSlider.addEventListener('change', async () => {
+      const token = blynkTokenInput.value.trim();
+      if (!token) return;
+      const speed = speedSlider.value;
+      
+      try {
+        const res = await fetch(`https://blynk.cloud/external/api/update?token=${token}&V2=${speed}`);
+        if (res.ok) {
+          log(`Max speed limit updated: ${speed}`, "info");
+        } else {
+          log("Failed to update speed limit on Blynk.", "error");
+        }
+      } catch (err) {
+        log(`Speed slider error: ${err.message}`, "error");
+      }
+    });
+
+    // KEYBOARD DRIVE STEERING
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement.tagName === 'INPUT') return; // Don't trigger when typing in fields
+      
+      let key = e.key;
+      if (key in activeKeys) {
+        activeKeys[key] = true;
+        updateKeyUI(key, true);
+        processSteering();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      let key = e.key;
+      if (key in activeKeys) {
+        activeKeys[key] = false;
+        updateKeyUI(key, false);
+        processSteering();
+      }
+    });
+
+    function updateKeyUI(key, isPressed) {
+      let elementId = '';
+      if (key === 'w' || key === 'ArrowUp') elementId = 'keyW';
+      else if (key === 'a' || key === 'ArrowLeft') elementId = 'keyA';
+      else if (key === 's' || key === 'ArrowDown') elementId = 'keyS';
+      else if (key === 'd' || key === 'ArrowRight') elementId = 'keyD';
+      
+      if (elementId) {
+        const el = document.getElementById(elementId);
+        if (isPressed) el.classList.add('active');
+        else el.classList.remove('active');
+      }
+    }
+
+    function processSteering() {
+      // Calculate joyX and joyY based on active keys
+      let x = 0;
+      let y = 0;
+
+      if (activeKeys.w || activeKeys.ArrowUp) y = 255;
+      if (activeKeys.s || activeKeys.ArrowDown) y = -255;
+      if (activeKeys.d || activeKeys.ArrowRight) x = 255;
+      if (activeKeys.a || activeKeys.ArrowLeft) x = -255;
+
+      // Only send if changes occurred
+      if (x !== lastSentJoystick.x || y !== lastSentJoystick.y) {
+        lastSentJoystick = { x, y };
+        
+        // Debounce / throttle transmitting to Blynk so we don't hit rate limits
+        if (joystickTransmitTimer) clearTimeout(joystickTransmitTimer);
+        joystickTransmitTimer = setTimeout(() => {
+          sendJoystickData(x, y);
+        }, 100);
+      }
+    }
+
+    async function sendJoystickData(x, y) {
+      const token = blynkTokenInput.value.trim();
+      if (!token) return;
+      if (!systemToggle.checked) {
+        log("Cannot steer: Drive Power is OFF.", "error");
+        return;
+      }
+
+      try {
+        log(`Steering update -> JoyX: ${x}, JoyY: ${y}`, "info");
+        // Update both V0 (X) and V1 (Y)
+        await Promise.all([
+          fetch(`https://blynk.cloud/external/api/update?token=${token}&V0=${x}`),
+          fetch(`https://blynk.cloud/external/api/update?token=${token}&V1=${y}`)
+        ]);
+      } catch (err) {
+        log(`Steering update error: ${err.message}`, "error");
+      }
+    }
+  </script>
+</body>
+</html>
